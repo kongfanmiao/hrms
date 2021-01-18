@@ -16,6 +16,91 @@ unit_map = {3: r'$mA$',
             9: r'$nA$',
             12: r'$pA$'}
 
+def plot_by_meas(meas, **kwargs):
+    """
+    Args:
+        meas: Measurement object
+        kwargs: other optional arguments for matplotlib.pyplot
+    """
+    dataset = meas.dataset
+    figtitle = '{},{}\n{}\n'.format(meas.sample.full_name,
+                                    meas.experiment.name,
+                                    meas.name)
+    figname = ' '.join((meas.sample.full_name,
+                        meas.experiment.name,
+                        meas.name))
+    figpath = os.path.join(meas.filepath, figname)
+
+    plot(dataset, figpath, figtitle, **kwargs)
+
+
+def plot_by_id(run_id,
+               sample: Optional[Union[Sample, str]]=None,
+               **kwargs):
+
+    if sample is None:
+        dataset = load_by_id(run_id)
+        sample_name = dataset.sample_name
+    else:
+        if isinstance(sample, Sample):
+            sample_name = sample.full_name
+        elif isinstance(sample, str):
+            sample_name = sample
+        dataset = load_by_run_spec(sample_name=sample_name,
+                                   captured_run_id=run_id)
+    
+    figtitle = '{},{}\n{}\n'.format(sample_name,
+                                    dataset.exp_name,
+                                    dataset.name)
+    figname = ' '.join((sample_name,
+                        dataset.exp_name,
+                        dataset.name))
+    db_path = dataset.path_to_db
+    figpath = os.path.join(os.path.dirname(db_path), figname)
+
+    plot(dataset, figpath, figtitle, **kwargs)
+
+
+def plot_av_by_meas(meas, **kwargs):
+
+    dataset = meas.dataset
+    figtitle = '{},{}\n{} AVERAGE\n'.format(meas.sample.full_name,
+                                    meas.experiment.name,
+                                    meas.name)
+    figname = ' '.join((meas.sample.full_name,
+                        meas.experiment.name,
+                        meas.name)) + " AVERAGE"
+    figpath = os.path.join(meas.filepath, figname)
+
+    plot_av(dataset, figpath, figtitle, **kwargs)
+
+
+def plot_av_by_id(run_id,
+               sample: Optional[Union[Sample, str]]=None,
+               **kwargs):
+
+    if sample is None:
+        dataset = load_by_id(run_id)
+        sample_name = dataset.sample_name
+    else:
+        if isinstance(sample, Sample):
+            sample_name = sample.full_name
+        elif isinstance(sample, str):
+            sample_name = sample
+        dataset = load_by_run_spec(sample_name=sample_name,
+                                   captured_run_id=run_id)
+    
+    figtitle = '{},{}\n{} AVERAGE\n'.format(sample_name,
+                                    dataset.exp_name,
+                                    dataset.name)
+    figname = ' '.join((sample_name,
+                        dataset.exp_name,
+                        dataset.name)) + " AVERAGE"
+    db_path = dataset.path_to_db
+    figpath = os.path.join(os.path.dirname(db_path), figname)
+
+    plot_av(dataset, figpath, figtitle, **kwargs)
+
 
 def plot(dataset, figpath, figtitle,
          ticksfont=24, titlefont=24, legendfont=18,
@@ -64,51 +149,28 @@ def plot(dataset, figpath, figtitle,
     plt.savefig(figpath)
 
 
-def plot_by_meas(meas, **kwargs):
-    """
-    Args:
-        meas: Measurement object
-        kwargs: other optional arguments for matplotlib.pyplot
-    """
-    dataset = meas.dataset
-    figtitle = '{},{}\n{}\n'.format(meas.sample.full_name,
-                                    meas.experiment.name,
-                                    meas.name)
-    figname = ' '.join((meas.sample.full_name,
-                        meas.experiment.name,
-                        meas.name))
-    figpath = os.path.join(meas.filepath, figname)
+def plot_av(dataset, figpath, figtitle,
+            ticksfont=24, titlefont=24, legendfont=18,
+            lg_border_linewidth=1, figsize=(15,15), **kwargs):
 
-    plot(dataset, figpath, figtitle, **kwargs)
+    current = dataset.get_parameter_data()['current']['current'][0]
+    voltage = dataset.get_parameter_data()['current']['voltage'][0]
+    current_av = np.nanmean(current, 0)
+    voltage_av = np.nanmean(voltage, 0)
 
+    matplotlib.rcParams["axes.linewidth"] = 2
+    plt.figure(figsize=figsize)
+    plt.xlabel('Voltage (V)', fontsize=ticksfont)
+    yscale = _auto_yscale(current_av)
+    plt.ylabel(f'Current ({unit_map[yscale]})', fontsize=ticksfont)
+    plt.title(figtitle, fontsize=titlefont)
 
-def plot_by_id(run_id,
-               sample: Optional[Union[Sample, str]]=None,
-               **kwargs):
+    plt.plot(voltage_av, current_av)
+    plt.xticks(fontsize=ticksfont)
+    plt.yticks(fontsize=ticksfont)
 
-    if sample is None:
-        dataset = load_by_id(run_id)
-        sample_name = dataset.sample_name
-    else:
-        if isinstance(sample, Sample):
-            sample_name = sample.full_name
-        elif isinstance(sample, str):
-            sample_name = sample
-        dataset = load_by_run_spec(sample_name=sample_name,
-                                   captured_run_id=run_id)
+    plt.savefig(figpath)
     
-    figtitle = '{},{}\n{}\n'.format(sample_name,
-                                    dataset.exp_name,
-                                    dataset.name)
-    figname = ' '.join((sample_name,
-                        dataset.exp_name,
-                        dataset.name))
-    db_path = dataset.path_to_db
-    figpath = os.path.join(os.path.dirname(db_path), figname)
-
-    plot(dataset, figpath, figtitle, **kwargs)
-    
-
 
 def _auto_yscale(yarray):
     
