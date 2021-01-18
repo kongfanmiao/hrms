@@ -27,12 +27,17 @@ print(sp)
 
 filepath = os.path.join(os.getcwd(), f"{sp.name}\\{sp.full_name}")
 
+try:
+    os.chdir(f"./{sp.name}/{sp.full_name}")
+except FileNotFoundError:
+    os.mkdir(f"./{sp.name}/{sp.full_name}")
+
 #%% Set parameters
-max_v = 950
+max_v = 10
 step_v = 1
 npts_per_step = 1
 time_step = 1
-num_sweep = 2
+num_sweep = 4
 
 #%% Create experiment, instrument, station, and measurement object
 exp = staircase_sweep(sp)

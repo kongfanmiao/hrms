@@ -93,8 +93,6 @@ class MeasureStaircaseSweep(Measurement):
             relax_time =relax_time
         ) # these keys will be converted to a string
         measname = self.get_meas_name()
-        print("Measurement name: {}".format(measname))
-
 
     
     def configure_k6517a(self,
