@@ -16,6 +16,7 @@ class Sample():
         self.contact_method = contact_method
         self.probe_distance = probe_distance
 
+
     @property
     def full_name(self):
         """
@@ -25,6 +26,22 @@ class Sample():
         spname += '-0' if self.label < 10 else '-'
         spname += str(self.label)
         return spname
+    
+
+    @property
+    def file_path(self):
+        """
+        The folder for a specific sample
+        """
+        try:
+            return self._file_path
+        except:
+            raise NameError("Please specify the file path")
+
+
+    @file_path.setter
+    def file_path(self, filepath):
+        self._file_path = filepath
 
     # @property
     # def contact_method(self):
