@@ -7,8 +7,8 @@ from typing import Optional, Union
 from qcodes.dataset.data_set import load_by_id, load_by_run_spec
 #from qcodes.dataset.sqlite.database import connect
 
-from measurement import MeasureStaircaseSweep
-from sample import Sample
+from .measurement import MeasureStaircaseSweep
+from .sample import Sample
 
 
 unit_map = {3: r'$mA$',
@@ -23,12 +23,8 @@ def plot_by_meas(meas, **kwargs):
         kwargs: other optional arguments for matplotlib.pyplot
     """
     dataset = meas.dataset
-    figtitle = '{},{}\n{}\n'.format(meas.sample.full_name,
-                                    meas.experiment.name,
-                                    meas.name)
-    figname = ' '.join((meas.sample.full_name,
-                        meas.experiment.name,
-                        meas.name))
+    figtitle = meas.name + '\n'
+    figname = meas.name
     figpath = os.path.join(meas.filepath, figname)
 
     plot(dataset, figpath, figtitle, **kwargs)
@@ -49,12 +45,8 @@ def plot_by_id(run_id,
         dataset = load_by_run_spec(sample_name=sample_name,
                                    captured_run_id=run_id)
     
-    figtitle = '{},{}\n{}\n'.format(sample_name,
-                                    dataset.exp_name,
-                                    dataset.name)
-    figname = ' '.join((sample_name,
-                        dataset.exp_name,
-                        dataset.name))
+    figtitle = dataset.name + '\n'
+    figname = dataset.name
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
@@ -64,12 +56,8 @@ def plot_by_id(run_id,
 def plot_av_by_meas(meas, **kwargs):
 
     dataset = meas.dataset
-    figtitle = '{},{}\n{} AVERAGE\n'.format(meas.sample.full_name,
-                                    meas.experiment.name,
-                                    meas.name)
-    figname = ' '.join((meas.sample.full_name,
-                        meas.experiment.name,
-                        meas.name)) + " AVERAGE"
+    figtitle = '{} AVERAGE\n'.format(meas.name)
+    figname = meas.name + " AVERAGE"
     figpath = os.path.join(meas.filepath, figname)
 
     plot_av(dataset, figpath, figtitle, **kwargs)
@@ -90,12 +78,8 @@ def plot_av_by_id(run_id,
         dataset = load_by_run_spec(sample_name=sample_name,
                                    captured_run_id=run_id)
     
-    figtitle = '{},{}\n{} AVERAGE\n'.format(sample_name,
-                                    dataset.exp_name,
-                                    dataset.name)
-    figname = ' '.join((sample_name,
-                        dataset.exp_name,
-                        dataset.name)) + " AVERAGE"
+    figtitle = '{} AVERAGE\n'.format(dataset.name)
+    figname = dataset.name + " AVERAGE"
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
