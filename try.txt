@@ -1,7 +1,0 @@
-
-time
-sample
-Parameters:
-        max_v: 950max_v: 950max_v: 950
-max_v: 950
-max_v: 950
