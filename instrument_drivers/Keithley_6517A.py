@@ -244,14 +244,12 @@ class Keithley_6517A(VisaInstrument):
                            label='Voltage source range (Resistance mode)',
                            vals=Numbers(100, 1000))
         
-        self.vsr = float(self.res_vsource_range())
-        
         self.add_parameter('res_vsource_level',
                            set_cmd=':SENSe:RESistance:MANual:VSOurce:AMPLitude {}',
                            get_cmd=':SENSe:RESistance:MANual:VSOurce:AMPLitude?',
                            unit='V',
                            label='Voltage source level (manual range)',
-                           vals=Numbers(-self.vsr, self.vsr))
+                           vals=Numbers(-float(self._vsr()), float(self._vsr())))
 
         self.add_parameter('res_vsource_operate',
                            set_cmd=':SENSe:RESistance:MANual:VSOurce:OPERate {}',
@@ -514,6 +512,13 @@ class Keithley_6517A(VisaInstrument):
         self.add_function('wait', call_cmd='*WAI')
         
         self.connect_message()
+        
+    
+    def _vsr(self):
+        """
+        Get the latest vsource range
+        """
+        return self.res_vsource_range.cache()
 
 
     def _set_sense_function(self, sfunc: str):
