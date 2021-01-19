@@ -4,8 +4,7 @@ from qcodes import Parameter, ParamSpec
 from qcodes.utils.validators import Numbers
 from qcodes.instrument.base import Instrument
 
-from instrument_drivers.Keithley_6517A import Keithley_6517A
-from logging import log
+from .instrument_drivers.Keithley_6517A import Keithley_6517A
 
 import os
 import json
@@ -218,6 +217,7 @@ class MeasureStaircaseSweep(Measurement):
         current = np.array([])
         time = np.array([])
         voltage = np.array([])
+        flag = None
         # make sure vsource range is correct
         if abs(stop) > 100 and float(self.k6517a.res_vsource_range()) <= 100:
             self.k6517a.res_vsource_range(1000)
