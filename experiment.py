@@ -7,7 +7,7 @@ from qcodes import load_or_create_experiment
 from qcodes.dataset.experiment_container import Experiment
 from qcodes.dataset.sqlite.database import get_DB_location
 
-from sample import Sample
+from .sample import Sample
 
 def staircase_sweep(sample: Union[str, Sample], 
                     expname = 'staircase_sweep',
