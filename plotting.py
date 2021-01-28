@@ -23,8 +23,8 @@ def plot_by_meas(meas, **kwargs):
         kwargs: other optional arguments for matplotlib.pyplot
     """
     dataset = meas.dataset
-    figtitle = meas.name + '\n'
-    figname = meas.name
+    figtitle = f"Run id: {dataset.captured_run_id}\n" + meas.name + '\n'
+    figname = f"Run_id {dataset.captured_run_id} {meas.name}"
     figpath = os.path.join(meas.filepath, figname)
 
     plot(dataset, figpath, figtitle, **kwargs)
@@ -45,8 +45,8 @@ def plot_by_id(run_id,
         dataset = load_by_run_spec(sample_name=sample_name,
                                    captured_run_id=run_id)
     
-    figtitle = dataset.name + '\n'
-    figname = dataset.name
+    figtitle = f"Run id: {run_id}\n" + dataset.name + '\n'
+    figname = f"Run_id {run_id}\n" + dataset.name
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
