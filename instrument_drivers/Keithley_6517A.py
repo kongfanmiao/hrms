@@ -222,9 +222,9 @@ class Keithley_6517A(VisaInstrument):
                            docstring='{4: 3.5 digits, 5: 4.5 digits\
                                        6: 5.5 digits, 7: 6.5 digits}')
 
-        self.add_parameter('damping',
-                            set_cmd=f':SENSe:{self._raw_sense_function}:DAMPing {{}}',
-                            get_cmd=f':SENSe:{self._raw_sense_function}:DAMPing?',
+        self.add_parameter('current_damping',
+                            set_cmd=f':SENSe:CURRent:DAMPing {{}}',
+                            get_cmd=f':SENSe:CURRent:DAMPing?',
                             docstring='Only for current and resistance measurement',
                             val_mapping=create_on_off_val_mapping(on_val=1,
                                                                   off_val=0))
@@ -238,7 +238,7 @@ class Keithley_6517A(VisaInstrument):
         self.vsauto = 1 if self._vsource_mode == 'auto' else 0
 
         self.add_parameter('res_vsource_range',
-                           set_cmd=':SENSe:RESistance:MANual:VSOurce:RANGe {}',
+                           set_cmd=self._set_res_vsource_range,
                            get_cmd=':SENSe:RESistance:MANual:VSOurce:RANGe?',
                            unit='V',
                            label='Voltage source range (Resistance mode)',
@@ -249,7 +249,7 @@ class Keithley_6517A(VisaInstrument):
                            get_cmd=':SENSe:RESistance:MANual:VSOurce:AMPLitude?',
                            unit='V',
                            label='Voltage source level (manual range)',
-                           vals=Numbers(-float(self._vsr()), float(self._vsr())))
+                           vals=Numbers(-100, 100))    
 
         self.add_parameter('res_vsource_operate',
                            set_cmd=':SENSe:RESistance:MANual:VSOurce:OPERate {}',
@@ -514,11 +514,13 @@ class Keithley_6517A(VisaInstrument):
         self.connect_message()
         
     
-    def _vsr(self):
+    def _set_res_vsource_range(self, value):
         """
-        Get the latest vsource range
+        Set the vsource range and update the validators for res_vsource_level
+        at the same time.
         """
-        return self.res_vsource_range.cache()
+        self.write(f":SENSe:RESistance:MANual:VSOurce:RANGe {value}")
+        self.res_vsource_level.vals = Numbers(-value, value)
 
 
     def _set_sense_function(self, sfunc: str):
