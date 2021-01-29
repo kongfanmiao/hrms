@@ -511,6 +511,8 @@ class Keithley_6517A(VisaInstrument):
         # Wait until all the previous commands are finished
         self.add_function('wait', call_cmd='*WAI')
         
+        self._elements = self.elements_for_data()
+
         self.connect_message()
         
     
@@ -544,6 +546,12 @@ class Keithley_6517A(VisaInstrument):
         """
         _sense_function = self.sense_function.cache() or self.sense_function()
         return _sense_function
+    
+    def _timestamp(self):
+        """
+        cache of timestamp
+        """
+        return self.timestamp.cache() or self.timestamp()
 
 
     # Actually this can also make use of add_parameter()...
@@ -687,6 +695,7 @@ class Keithley_6517A(VisaInstrument):
 
         """
         cmd = ':FORMat:ELEMents'
+        self._elements = list(args)
         return self._elements_for(cmd, *args)
     
     
@@ -767,14 +776,13 @@ class Keithley_6517A(VisaInstrument):
         """
         Get the parsed data and convert list to numpy array.
         """
-        self.elements = self.elements_for_data()
         if tseq:
             raw_data = self.read_buffer_raw_data()
         else:
             raw_data = self.read_latest()
         parsed_data = self._parse_raw_data(raw_data)
         if not element or element=='all':
-            return {e: parsed_data[e] for e in self.elements}
+            return {e: parsed_data[e] for e in self._elements}
         else:
             if element not in self.elements_list.keys():
                 raise KeyError('The elements must be one of {}'.format(
@@ -794,13 +802,13 @@ class Keithley_6517A(VisaInstrument):
         # Humidity, Vsource"
         # Reading and Units Must be included
         
-        if 'reading' not in self.elements:
+        if 'reading' not in self._elements:
             raise ValueError('Reading must be included in the data')
         
         first_str = {'reading', 'status', 'units'}
-        N = len(set(self.elements) - first_str)
-        N = N + 2 if (('timestamp' in self.elements) 
-                      and self.timestamp()=='real') else N + 1       
+        N = len(set(self._elements) - first_str)
+        N = N + 2 if (('timestamp' in self._elements) 
+                      and self._timestamp()=='real') else N + 1       
         
         raw_data_list = list(map(str.strip, raw_data.split(',')))
         
@@ -813,16 +821,16 @@ class Keithley_6517A(VisaInstrument):
         units_map= {'VDC': 'V', 'ADC': 'A', 'OHM': 'Ohm', 'OHMCM': 'Ohm·cm',
                     'OHMSQ': 'Ohm/Sq', '%/V': '%/V', 'COUL': 'C'}
         status = []
-        if 'status' in self.elements:
+        if 'status' in self._elements:
             status = [status_map[s[13]] for s in rsu]
             units = units_map[rsu[0][14:]] # SINGLE STRING
         else:
             units = units_map[rsu[0][13:]]
         status = np.array(status)
         
-        tsi = int('timestamp' in self.elements) # timestamp index
+        tsi = int('timestamp' in self._elements) # timestamp index
         time = raw_data_list[1::N] if tsi==1 else []
-        if self.timestamp()=='real': # including date
+        if self._timestamp()=='real': # including date
             date = raw_data_list[2::N] if tsi==1 else []
             timestamp = [time[i] + ', ' + date[i] for i in range(len(time))]
         else: # use relative timestamp format, date not included
@@ -832,23 +840,23 @@ class Keithley_6517A(VisaInstrument):
             timestamp = [float(t[:-4]) for t in time]
         timestamp = np.array(timestamp)
         
-        rni = int('reading number' in self.elements) # reading number index
+        rni = int('reading number' in self._elements) # reading number index
         reading_number = raw_data_list[2*tsi+1::N] if rni==1 else []
         reading_number = np.array(reading_number)
         
-        ci = int('channel' in self.elements) # channel index
+        ci = int('channel' in self._elements) # channel index
         channel = raw_data_list[2*tsi+rni+1::N][0] if ci==1 else [] # SINGLE STRING
         channel = np.array(channel)
         
-        ti = int('temperature' in self.elements) # temperature index
+        ti = int('temperature' in self._elements) # temperature index
         temperature = raw_data_list[2*tsi+rni+ci+1::N] if ti==1 else []
         temperature = np.array(temperature)
         
-        hi = int('humidity' in self.elements) # humidity index
+        hi = int('humidity' in self._elements) # humidity index
         humidity = raw_data_list[2*tsi+rni+ci+ti+1::N] if hi==1 else []
         humidity = np.array(humidity)
         
-        vi = int('vsource' in self.elements)
+        vi = int('vsource' in self._elements)
         vsource = [float(v[:-4]) for v in raw_data_list[N-1::N]] if vi==1 else []
         vsource = np.array(vsource)
             
