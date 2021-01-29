@@ -97,7 +97,7 @@ class MeasureStaircaseSweep(Measurement):
     
     def configure_k6517a(self,
             sense_function='current',
-            auto_meas_range=False,
+            auto_meas_range=True,
             elements_for_data=('reading', 'units', 'timestamp', 'vsource'),
             timestamp_format='relative',
             current_damping=False):
@@ -124,6 +124,11 @@ class MeasureStaircaseSweep(Measurement):
         self.k6517a.res_vsource_range(vs_range)
         self.k6517a.elements_for_data(*elements_for_data)
         self.k6517a.auto_meas_range(auto_meas_range)
+
+        # here we define a internal variable to record the state of 
+        # auto_meas_range every time we change it, by default it's True
+        self._auto_range = auto_meas_range
+
         self.k6517a.timestamp(timestamp_format)
         #self.k6517a.meas_range(2e-9)
         self.k6517a.zerocheck(0)
@@ -232,42 +237,23 @@ class MeasureStaircaseSweep(Measurement):
             i = 0
             while i < self.sweep_arguments["npts_per_step"]:
                 sleep(self.sweep_arguments["time_step"])
-                c = self.k6517a.get_data('reading', tseq=False)
-                t = self.k6517a.get_data('timestamp', tseq=False)
+                dat = self.k6517a.get_data(tseq=False)
+                c = dat['reading']
+                t = dat['timestamp']
                 i += 1
             
-            if self.k6517a.auto_meas_range() == False:
-                # Change the measure range when necessary
-                # mr_now: measure range now
-                mr_now = float(self.k6517a.meas_range())
-                # absolute value of reading
-                absr = np.abs(c[0]) 
-                # get the floor and ceiling measure range of the current reading
-                flr = 2*10**(np.floor(np.log10(absr/2)))
-                cer = 2*10**(np.ceil(np.log10(absr/2)))
-                cer = cer*10 if cer == 2e-9 else cer
-                flr = flr/10 if flr == 2e-9 else flr
-                # current measure range too large for the reading
-                if mr_now > cer:
-                    # this usually happens for current absolute value change from 
-                    # large to small, which is the following condition:
-                    # if (step>0 and c[0]<0) or (step<0 and 1>c[0]>0):
-                    # then we narrow down the measure range
-                    self.k6517a.meas_range(cer)
-                    # when measure range change from 2e-8 to 2e-10, 
-                    # the next 3 points are usually bad
-                    flag = int((v-start)/step) if cer == 2e-10 else None
-                # current exceeds the mr_now
-                elif mr_now <= flr: 
-                    # this usually happens for current absolute value change from
-                    # small to large, there are two conditions:
-                    # 1. current exceeds but not oveflow
-                    if (0 < absr < 1):
-                        self.k6517a.meas_range(cer)
-                    # 2. current overflow
-                    elif absr > 1:
-                        if mr_now <= 2e-3:
-                            self.k6517a.meas_range(mr_now*10)
+            # absolute value of reading
+            absr = np.abs(c[0])
+
+            if 0.5e-9<absr<2.5e-9:
+                self.k6517a.auto_meas_range(0)
+                self._auto_range = False
+                self.k6517a.meas_range(2e-8)
+            else:
+                if not self._auto_range:
+                    self.k6517a.auto_meas_range(1)
+                    self._auto_range = True
+
 
             # add data points to numpy array
             current = np.append(current, c)
