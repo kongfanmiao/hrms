@@ -389,7 +389,8 @@ class Keithley_6517A(VisaInstrument):
 
         # Aborts operation and returns to the top of the trigger model
         self.add_function('abort', call_cmd=':ABORt')
-        
+        # Abort the test sequence in progress
+        self.add_function('tseq_abort', call_cmd=':TSEQuence:ABORt')
         
 # =============================================================================
 #         # The last resort
@@ -457,25 +458,29 @@ class Keithley_6517A(VisaInstrument):
         self.add_function('relative_timestamp_reset',
                           call_cmd=':SYSTem:TSTamp:RELative:RESet')
         
-# =============================================================================
-#         self.add_parameter('tseq_voltage',
-#                            label='voltage',
-#                            get_cmd=self._get_tseq_voltage,
-#                            unit='V',
-#                            vals=Arrays(shape=(self.npts,)),
-#                            parameter_class=Parameter)
-# =============================================================================
+
+        self.add_parameter('tseq_voltage',
+                           label='voltage',
+                           get_cmd=self._get_tseq_voltage,
+                           unit='V',
+                           vals=Arrays(shape=(self.npts,)),
+                           parameter_class=Parameter)
         
-# =============================================================================
-#         self.add_parameter('tseq_current',
-#                            label='current',
-#                            get_cmd=self._get_tseq_current,
-#                            unit='A',
-#                            vals=Arrays(shape=(self.npts,)),
-#                            parameter_class=ParameterWithSetpoints)
-#         
-#         self.tseq_current.setpoints = (self.tseq_voltage,)
-# =============================================================================
+        self.add_parameter('tseq_current',
+                           label='current',
+                           get_cmd=self._get_tseq_current,
+                           unit='A',
+                           vals=Arrays(shape=(self.npts,)),
+                           parameter_class=ParameterWithSetpoints)
+        
+        self.add_parameter("tseq_time",
+                           label='time',
+                           get_cmd=self._get_tseq_time,
+                           unit='s',
+                           vals=Arrays(shape=(self.npts,)),
+                           parameter_class=Parameter)
+        
+        self.tseq_current.setpoints = (self.tseq_voltage,)
         
         self.add_parameter('voltage',
                            label='voltage',
@@ -757,6 +762,13 @@ class Keithley_6517A(VisaInstrument):
         Get the sweep axis (vsource) of tseq experiment.
         """
         return self.get_data('vsource', tseq=True)
+
+    
+    def _get_tseq_time(self) -> np.ndarray:
+        """
+        Get the tiem stamp of tseq experiment.
+        """
+        return self.get_data('timestamp', tseq=True)
     
     
     def _get_current(self):
