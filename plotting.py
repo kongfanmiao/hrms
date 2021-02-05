@@ -7,7 +7,7 @@ from typing import Optional, Union
 from qcodes.dataset.data_set import load_by_id, load_by_run_spec
 #from qcodes.dataset.sqlite.database import connect
 
-from .measurement import MeasureStaircaseSweep
+#from .measurement import StaircaseSweep
 from .sample import Sample
 
 
@@ -27,7 +27,7 @@ def plot_by_meas(meas, **kwargs):
     figname = f"Run_id {dataset.captured_run_id} {meas.name}"
     figpath = os.path.join(meas.filepath, figname)
 
-    plot(dataset, figpath, figtitle, **kwargs)
+    plot_ds(dataset, figpath=figpath, figtitle=figtitle, **kwargs)
 
 
 def plot_by_id(run_id,
@@ -50,7 +50,7 @@ def plot_by_id(run_id,
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
-    plot(dataset, figpath, figtitle, **kwargs)
+    plot_ds(dataset, figpath=figpath, figtitle=figtitle, **kwargs)
 
 
 def plot_av_by_meas(meas, **kwargs):
@@ -60,7 +60,7 @@ def plot_av_by_meas(meas, **kwargs):
     figname = meas.name + " AVERAGE"
     figpath = os.path.join(meas.filepath, figname)
 
-    plot_av(dataset, figpath, figtitle, **kwargs)
+    plot_av(dataset,figpath=figpath, figtitle=figtitle, **kwargs)
 
 
 def plot_av_by_id(run_id,
@@ -83,29 +83,52 @@ def plot_av_by_id(run_id,
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
-    plot_av(dataset, figpath, figtitle, **kwargs)
+    plot_av(dataset, figpath=figpath, figtitle=figtitle, **kwargs)
 
 
-def plot(dataset, figpath, figtitle,
-         ticksfont=24, titlefont=24, legendfont=18,
-         lg_border_linewidth=1, figsize=(15,15), **kwargs):
+
+
+
+def plot_ds(dataset, **kwargs):
     """
-
+    Plot the dataset
     """
-    current = dataset.get_parameter_data()['current']['current'][0]
-    voltage = dataset.get_parameter_data()['current']['voltage'][0]
-    #time = dataset['current']['time']
+    data = dataset.get_parameter_data()
+    for key, value in data.items():
+        if 'current' in key:
+            for k, v in value.items():
+                if 'voltage' in k:
+                    voltage = v
+                if 'current' in k:
+                    current = v
+        # if 'time' in key:
+        #     time = list(value.values())[0]
+    
+    plot(voltage, current, **kwargs)
+
+
+def plot(x, y, figtitle, figpath=None, 
+         ticksfont=18, titlefont=20, legendfont=10,
+         lg_border_linewidth=1, figsize=(10,8),
+         scatter=False, save=False, **kwargs):
+    """
+    The low level method of plot
+    """
 
     matplotlib.rcParams["axes.linewidth"] = 2
     plt.figure(figsize=figsize)
     plt.xlabel('Voltage (V)', fontsize=ticksfont)
-    yscale = _auto_yscale(current)
+    yscale = _auto_yscale(y)
     plt.ylabel(f'Current ({unit_map[yscale]})', fontsize=ticksfont)
     plt.title(figtitle, fontsize=titlefont)
 
+    # in the old framework all data are added as one element of an array
+    if len(y) == 1:
+        x, y = x[0], y[0]
+
     def _plot(i:int, **kwargs):
-        c = current[i]
-        v = voltage[i]
+        c = y[i]
+        v = x[i]
         #t = time[i]
         numdict = {1: '$1^{st}$', 2: '$2^{nd}$', 3: '$3^{rd}$'}
         label = "The {} {} sweep"
@@ -119,9 +142,12 @@ def plot(dataset, figpath, figtitle,
                 label = label.format(numdict[1 + (i / 2)], 'forward')
             else:
                 label = label.format(f'{i // 2 + 1}' + '$^{th}$', 'forward')
-        plt.plot(v,c*10**yscale, label=label, **kwargs)
+        if scatter== False:
+            plt.plot(v,c*10**yscale, label=label, **kwargs)
+        else:
+            plt.scatter(v,c*10**yscale, label=label, **kwargs)
     
-    for i in range(current.shape[0]):
+    for i in range(y.shape[0]):
         _plot(i, **kwargs)
     
     plt.xticks(fontsize=ticksfont)
@@ -130,30 +156,54 @@ def plot(dataset, figpath, figtitle,
     legend.get_frame().set_linewidth(lg_border_linewidth)
     legend.get_frame().set_edgecolor("black")
     
-    plt.savefig(figpath)
+    if save:
+        if not figpath:
+            raise KeyError("Please provide a figurepath to save your figure")
+        plt.savefig(figpath)
 
 
-def plot_av(dataset, figpath, figtitle,
-            ticksfont=24, titlefont=24, legendfont=18,
-            lg_border_linewidth=1, figsize=(15,15), **kwargs):
+def plot_av(dataset, figtitle, figpath=None,
+            ticksfont=18, titlefont=20, legendfont=10,
+            lg_border_linewidth=1, figsize=(10,8),
+            scatter=False, save=False,**kwargs):
 
-    current = dataset.get_parameter_data()['current']['current'][0]
-    voltage = dataset.get_parameter_data()['current']['voltage'][0]
-    current_av = np.nanmean(current, 0)
-    voltage_av = np.nanmean(voltage, 0)
+    current = dataset.get_parameter_data()['current']['current']
+    voltage = dataset.get_parameter_data()['current']['voltage']
+    if len(current) == 1:
+        current = current[0]
+        voltage = voltage[0]
+    current_fw = current[0::2]
+    current_fw_av = np.nanmean(current_fw, 0)
+    current_bw = current[1::2]
+    current_bw_av = np.nanmean(current_bw, 0)
+    voltage_fw_av = voltage[0,:]
+    voltage_bw_av = voltage[1,:]
 
     matplotlib.rcParams["axes.linewidth"] = 2
     plt.figure(figsize=figsize)
     plt.xlabel('Voltage (V)', fontsize=ticksfont)
-    yscale = _auto_yscale(current_av)
+    yscale = _auto_yscale(current_fw_av)
     plt.ylabel(f'Current ({unit_map[yscale]})', fontsize=ticksfont)
     plt.title(figtitle, fontsize=titlefont)
 
-    plt.plot(voltage_av, current_av)
+    if scatter:
+        plt.scatter(voltage_fw_av, current_fw_av*10**yscale,
+                    label="Forward Average")
+        plt.scatter(voltage_bw_av, current_bw_av*10**yscale,
+                    label="Forward Average")
+    else:
+        plt.plot(voltage_fw_av, current_fw_av*10**yscale,
+                 label="Forward Average")
+        plt.plot(voltage_bw_av, current_bw_av*10**yscale,
+                 label="Forward Average")
+
     plt.xticks(fontsize=ticksfont)
     plt.yticks(fontsize=ticksfont)
 
-    plt.savefig(figpath)
+    if save:
+        if not figpath:
+            raise KeyError("Please provide a figurepath to save your figure")
+        plt.savefig(figpath)
     
 
 def _auto_yscale(yarray):
