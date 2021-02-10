@@ -31,13 +31,13 @@ class StaircaseSweep(Measurement):
     """
 
     def __init__(self, high_res:bool, experiment, station, 
-                 sample, filepath, name=""):
+                 sample, name=""):
         super().__init__(experiment, station, name)
         self._mode = ""
         self.high_res = high_res
         # name is empty string here, wil be given after setting up parameters
         self.sample = sample # instance of Sample class
-        self.filepath = filepath
+        self.filepath = self.sample.file_path
         # If high resistance mode is true, check if keithley 6517a is present
         self.instruments = self.station.components
         
@@ -198,8 +198,8 @@ class TSEQStaircaseSweep(StaircaseSweep):
     The built-in function of keithley 6517A
     """
     def __init__(self, high_res:bool, experiment, station, 
-                 sample, filepath, name=""):
-        super().__init__(high_res,experiment,station,sample,filepath,name)
+                 sample, name=""):
+        super().__init__(high_res,experiment,station,sample,name)
         self.register_parameter(self.k6517a.tseq_voltage)
         self.register_parameter(self.k6517a.tseq_current)
         self.register_parameter(self.k6517a.tseq_time)
@@ -300,8 +300,6 @@ class TSEQStaircaseSweep(StaircaseSweep):
             self.log_run_id(self.dataset)
     
 
-        
-
 
 class CustomizedStaircaseSweep(StaircaseSweep):
     """
@@ -309,8 +307,8 @@ class CustomizedStaircaseSweep(StaircaseSweep):
     staircase sweep
     """
     def __init__(self, high_res:bool, experiment, station, 
-                 sample, filepath, name=""):
-        super().__init__(high_res,experiment,station,sample,filepath,name)
+                 sample, name=""):
+        super().__init__(high_res,experiment,station,sample,name)
         self._mode = "Customized Staircase Sweep"
         self.sweep_voltage = Parameter(name='voltage',
                                   label='Voltage',
@@ -441,9 +439,7 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         run() method already exists in qcodes and it returns a Runner object
         """
         # empty nummpy array to store data for one single sweep
-        current = np.array([])
-        time = np.array([])
-        voltage = np.array([])
+        _curr, _volt, _time = [], [], []
         
         # when change to 200 pA range the next two or three points are bad,
         # need to remove them
@@ -460,11 +456,15 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         for v in tqdm(np.arange(start, stop, step)):
             self.k6517a.res_vsource_level(v)
             i = 0
+            # data list for one reading
+            c, t = [], []
             while i < self.sweep_arguments["npts_per_step"]:
                 sleep(self.sweep_arguments["time_step"])
                 dat = self.k6517a.get_data(tseq=False)
-                c = dat['reading']
-                t = dat['timestamp']
+                ci = dat['reading']
+                ti = dat['timestamp']
+                c.append(ci[0])
+                t.append(ti[0])
                 i += 1
             
             # absolute value of reading
@@ -527,11 +527,16 @@ class CustomizedStaircaseSweep(StaircaseSweep):
                         self.k6517a.meas_range(2e-9)
                         self._meas_range = 2e-9
 
-            # add data points to numpy array
-            current = np.append(current, c)
-            time = np.append(time, t)
-            voltage = np.append(voltage, v)
-        
+            # add data points to list
+            for i in range(len(c)):
+                _curr.append(c[i])
+                _volt.append(v)
+                _time.append(t[i])
+
+        # convert to numpy array
+        current = np.array(_curr)
+        voltage = np.array(_volt)
+        time = np.array(_time)
         # remove the next two points when changing measure range from 20 nA
         # to 200 pA
         if flag142pA >= 5:
@@ -539,8 +544,6 @@ class CustomizedStaircaseSweep(StaircaseSweep):
                 current[i] = np.nan
                 time[i] = np.nan
                 voltage[i] = np.nan
-
-
         # remove bad points, (usually infinite values)
         current[current>1] = np.nan
 
