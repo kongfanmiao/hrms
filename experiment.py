@@ -10,7 +10,7 @@ from qcodes.dataset.sqlite.database import get_DB_location
 from .sample import Sample
 
 def staircase_sweep(sample: Union[str, Sample], 
-                    expname = 'staircase_sweep',
+                    expname = 'staircase sweep',
                     **kwargs) -> Experiment:
     
     if isinstance(sample, Sample):
