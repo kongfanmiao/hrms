@@ -56,11 +56,11 @@ def plot_by_id(run_id,
 def plot_av_by_meas(meas, **kwargs):
 
     dataset = meas.dataset
-    figtitle = '{} AVERAGE\n'.format(meas.name)
+    figtitle = '{} \nAVERAGE\n'.format(meas.name)
     figname = meas.name + " AVERAGE"
     figpath = os.path.join(meas.filepath, figname)
 
-    plot_av(dataset,figpath=figpath, figtitle=figtitle, **kwargs)
+    plot_av_ds(dataset,figpath=figpath, figtitle=figtitle, **kwargs)
 
 
 def plot_av_by_id(run_id,
@@ -78,21 +78,31 @@ def plot_av_by_id(run_id,
         dataset = load_by_run_spec(sample_name=sample_name,
                                    captured_run_id=run_id)
     
-    figtitle = '{} AVERAGE\n'.format(dataset.name)
+    figtitle = '{} \nAVERAGE\n'.format(dataset.name)
     figname = dataset.name + " AVERAGE"
     db_path = dataset.path_to_db
     figpath = os.path.join(os.path.dirname(db_path), figname)
 
-    plot_av(dataset, figpath=figpath, figtitle=figtitle, **kwargs)
-
-
-
+    plot_av_ds(dataset, figpath=figpath, figtitle=figtitle, **kwargs)
 
 
 def plot_ds(dataset, **kwargs):
     """
     Plot the dataset
     """
+    current, voltage, _ = extract_data(dataset)
+    plot(voltage, current, **kwargs)
+
+
+def plot_av_ds(dataset, **kwargs):
+    """
+    Plot the averaged data of datasets
+    """
+    current, voltage, _ = extract_data(dataset)
+    plot_av(voltage, current, **kwargs)
+
+
+def extract_data(dataset):
     data = dataset.get_parameter_data()
     for key, value in data.items():
         if 'current' in key:
@@ -101,15 +111,18 @@ def plot_ds(dataset, **kwargs):
                     voltage = v
                 if 'current' in k:
                     current = v
-        # if 'time' in key:
-        #     time = list(value.values())[0]
-    
-    plot(voltage, current, **kwargs)
+                # this is the old dataset framework
+                if "time" in k:
+                    time = v
+        # this is the new dataset framework
+        if 'time' in key:
+            time = list(value.values())[0]
+    return current, voltage, time
 
 
 def plot(x, y, figtitle, figpath=None, 
          ticksfont=18, titlefont=20, legendfont=10,
-         lg_border_linewidth=1, figsize=(10,8),
+         lg_border_linewidth=1, figsize=(10,8), bbox_to_anchor=(1.4,1),
          scatter=False, save=False, **kwargs):
     """
     The low level method of plot
@@ -152,7 +165,8 @@ def plot(x, y, figtitle, figpath=None,
     
     plt.xticks(fontsize=ticksfont)
     plt.yticks(fontsize=ticksfont)
-    legend = plt.legend(fontsize=legendfont)
+    legend = plt.legend(fontsize=legendfont,
+                        bbox_to_anchor=bbox_to_anchor)
     legend.get_frame().set_linewidth(lg_border_linewidth)
     legend.get_frame().set_edgecolor("black")
     
@@ -162,22 +176,20 @@ def plot(x, y, figtitle, figpath=None,
         plt.savefig(figpath)
 
 
-def plot_av(dataset, figtitle, figpath=None,
+def plot_av(x, y, figtitle, figpath=None,
             ticksfont=18, titlefont=20, legendfont=10,
             lg_border_linewidth=1, figsize=(10,8),
             scatter=False, save=False,**kwargs):
 
-    current = dataset.get_parameter_data()['current']['current']
-    voltage = dataset.get_parameter_data()['current']['voltage']
-    if len(current) == 1:
-        current = current[0]
-        voltage = voltage[0]
-    current_fw = current[0::2]
+    if len(y) == 1:
+        y = y[0]
+        x = x[0]
+    current_fw = y[0::2]
     current_fw_av = np.nanmean(current_fw, 0)
-    current_bw = current[1::2]
+    current_bw = y[1::2]
     current_bw_av = np.nanmean(current_bw, 0)
-    voltage_fw_av = voltage[0,:]
-    voltage_bw_av = voltage[1,:]
+    voltage_fw_av = x[0,:]
+    voltage_bw_av = x[1,:]
 
     matplotlib.rcParams["axes.linewidth"] = 2
     plt.figure(figsize=figsize)
@@ -195,10 +207,11 @@ def plot_av(dataset, figtitle, figpath=None,
         plt.plot(voltage_fw_av, current_fw_av*10**yscale,
                  label="Forward Average")
         plt.plot(voltage_bw_av, current_bw_av*10**yscale,
-                 label="Forward Average")
+                 label="Backward Average")
 
     plt.xticks(fontsize=ticksfont)
     plt.yticks(fontsize=ticksfont)
+    plt.legend()
 
     if save:
         if not figpath:
