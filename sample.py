@@ -1,7 +1,6 @@
-"""
+import os
 
-"""
-
+from qcodes.dataset.sqlite.database import initialise_or_create_database_at
 
 
 class Sample():
@@ -42,36 +41,15 @@ class Sample():
     @file_path.setter
     def file_path(self, filepath):
         self._file_path = filepath
+    
 
-    # @property
-    # def contact_method(self):
-    #     """
-    #     Probes directlly contact the sample or using siver paste
-    #     """
-    #     try:
-    #         return self._contact_method
-    #     except:
-    #         raise NameError("Please specify the probe contact method")
-
-    # @contact_method.setter
-    # def contact_method(self, method:str):
-    #     self._contact_method = method
-
-    # @property
-    # def probe_distance(self):
-    #     """
-    #     The distance between two probes
-    #     Here we consider two probes measurement. Need to update for four-probe measurement
-    #     """
-    #     try:
-    #         return self._probe_distance
-    #     except:
-    #         raise NameError("Please specify the distance between two probes")
-
-    # @probe_distance.setter
-    # def probe_distance(self, dist:float):
-    #     # by default, the unit is mm
-    #     self._probe_distance = str(dist) + ' mm'
+    def create_database(self):
+        if not os.path.exists(f"./{self.name}/{self.full_name}"):
+            os.makedirs(f"./{self.name}/{self.full_name}", exist_ok=True)
+        filepath = os.path.join(os.getcwd(), f"{self.name}\\{self.full_name}")
+        self.file_path = filepath
+        db_path = os.path.join(filepath, f"{self.full_name}.db")
+        initialise_or_create_database_at(db_path)
 
 
     def __str__(self):
