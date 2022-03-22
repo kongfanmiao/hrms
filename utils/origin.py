@@ -6,6 +6,8 @@ def write_excel2origin_script(sample_name, path, files):
     Origin. Open Origin and click code builder, open this script file and run it,
     then it will import the data from the specified excel files.
     """
+    path = os.path.normpath(path)
+    path = path.replace('\\', '\\\\')
     with open(os.path.join(path, "excel2origin.py"), 'w') as py:
         py.write(f"""
 
