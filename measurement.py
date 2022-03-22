@@ -4,8 +4,8 @@ from qcodes import Parameter, ParamSpec
 from qcodes.utils.validators import Numbers
 from qcodes.instrument.base import Instrument
 from qcodes.dataset.data_set import DataSet
-
-from .instrument_drivers.Keithley_6517A import Keithley_6517A
+from qcodes.instrument_drivers.tektronix.Keithley_6517A import Keithley_6517A
+from .configuration.config import ConfigInstrument
 
 import os
 import json
@@ -40,6 +40,7 @@ class StaircaseSweep(Measurement):
         self.filepath = self.sample.file_path
         # If high resistance mode is true, check if keithley 6517a is present
         self.instruments = self.station.components
+        self.instr_config = ConfigInstrument(path=self.filepath)
 
         if self.high_res:
             for name, instr in self.instruments.items():
@@ -52,39 +53,40 @@ class StaircaseSweep(Measurement):
                     {self.instruments}")
 
         self.add_before_run(self.door_closed_or_not, args=())
+        self.add_after_run(self.close_k6517a_output, args=())
 
-    def set_parameters(self, max_v, step_v, npts_per_step,
-                       time_step, num_sweep, start_from='max', relax_time=0):
+    def set_parameters(self, start_v, stop_v, step_v, npts_per_step,
+                       time_step, num_sweep, relax_time=0):
         """
         Set staircase sweep measurement parameters
         Args:
-            max_v: maximum voltage
+            start_v: start voltage
+            stop_v: stop voltage
             step_v: step voltage
             npts_per_step: number of data points per step
             time_step: time of each step
             num_sweep: number of sweeps
             relax_time: relax time after each sweep, set to 0 by default
         """
-        Numbers(0, 1000).validate(max_v)
-        Numbers(0, max_v).validate(step_v)
-
-        self.sweep_arguments = dict(
-            max_v=max_v,
-            step_v=step_v,
-            npts_per_step=npts_per_step,
-            time_step=time_step,
-            num_sweep=num_sweep,
-            start_from=start_from,
-            relax_time=relax_time
-        )  # these keys will be converted to a string
+        Numbers(0, 1000).validate(abs(start_v))
+        Numbers(0, 1000).validate(abs(stop_v))
+        Numbers(0, abs(start_v - stop_v)).validate(abs(step_v))
+        self.max_v = max(abs(start_v), abs(stop_v))
+        self.sweep_arguments = locals()
         self.get_meas_name()
 
     def door_closed_or_not(self):
         # Make sure the enclosure door is closed for hazardous voltage
-        if self.sweep_arguments["max_v"] >= 36:
+        if self.max_v >= 36:
             if self.k6517a.interlock() == False:
                 raise RuntimeError("Please close the cabinet door before \
                         using hazardous voltage!")
+                        
+    def close_k6517a_output(self):
+        try:
+            self.k6517a.operate(False)
+        except:
+            pass
 
     def print_info(self):
         # print these information before starting sweep
@@ -144,6 +146,16 @@ Data:
             f.write(f"{dataset.captured_run_id}:{self._mode}, {self.name}\n")
         f.close()
 
+    def log_6517a(self):
+        # after configuring the parameters, record the snapshot to json and log file
+        # k6517a_json = self.k6517a.name + "_snapshot.json"
+        k6517a_log = self.k6517a.name + "_snapshot_readable.log"
+        # self.instr_config.write_file(path=os.path.join(self.filepath, k6517a_json),
+        #                              content=self.k6517a.snapshot())
+        self.instr_config.write_file(path=os.path.join(self.filepath, k6517a_log),
+                                     from_print=True,
+                                     print_func=self.k6517a.print_readable_snapshot)
+ 
     def get_meas_name(self):
         """
         Get the measurement name based on given parameters
@@ -157,14 +169,13 @@ Data:
             sr_str = str(sr).replace('.', '-')
         sweep_rate_str = sr_str + 'V-s'
 
-        volt_range = str(params["max_v"]) + 'V'
+        volt_range = str(params["start_v"])+'to'+str(params["stop_v"]) + 'V'
         num_sweep = str(params["num_sweep"]) + ' sweeps'
-        start_mode = "start from " + params["start_from"]
         relax = 'relax ' + str(int(params["relax_time"]/60)) + 'mins' if (
             params["relax_time"] != 0) else ''
         params_list = [self.sample.full_name, self.experiment.name,
                        self.sample.contact_method, sweep_rate_str, volt_range,
-                       num_sweep, start_mode, relax]
+                       num_sweep, relax]
         self.name = "__".join(params_list).strip('_')
         return self.name
 
@@ -222,6 +233,9 @@ class TSEQStaircaseSweep(StaircaseSweep):
         self.k6517a.tseq_type('stsweep')
         self.k6517a.tseq_trigger_source('immediate')
 
+        self.log_6517a()
+
+
     def start_sweep(self):
         """
         Start the measuring
@@ -231,14 +245,10 @@ class TSEQStaircaseSweep(StaircaseSweep):
         self.data_dict = {}
 
         # initialize the start, stop, and step voltage
-        if self.sweep_arguments["start_from"] == 'max':
-            start_voltage = self.sweep_arguments["max_v"]
-            stop_voltage = -self.sweep_arguments["max_v"]
-            step_voltage = -self.sweep_arguments["step_v"]
-        elif self.sweep_arguments["start_from"] == '-max':
-            start_voltage = -self.sweep_arguments["max_v"]
-            stop_voltage = self.sweep_arguments["max_v"]
-            step_voltage = self.sweep_arguments["step_v"]
+        start_voltage = self.sweep_arguments["start_v"]
+        stop_voltage = self.sweep_arguments["stop_v"]
+        step_voltage = self.sweep_arguments["step_v"]
+
         step_time = self.sweep_arguments["time_step"]
 
         self._do_sweep(start_voltage, step_voltage, stop_voltage, step_time)
@@ -279,7 +289,7 @@ class TSEQStaircaseSweep(StaircaseSweep):
                     })
 
                     self.k6517a.zerocheck(1)
-                    start, step, stop = -start, -step, -stop
+                    start, step, stop = stop, -step, start
 
                 except KeyboardInterrupt:
                     self.k6517a.tseq_abort()
@@ -345,7 +355,7 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         self.k6517a.current_damping(current_damping)
         self.k6517a.meter_connect(1)
         self.k6517a.res_auto_vsource(0)
-        vs_range = 1000 if self.sweep_arguments["max_v"] > 100 else 100
+        vs_range = 1000 if self.max_v > 100 else 100
         self.k6517a.res_vsource_range(vs_range)
         self.k6517a.elements_for_data(*elements_for_data)
         self.k6517a.auto_meas_range(auto_meas_range)
@@ -357,6 +367,8 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         self.k6517a.timestamp(timestamp_format)
         # self.k6517a.meas_range(2e-9)
         self.k6517a.zerocheck(0)
+
+        self.log_6517a()
 
     def start_sweep(self):
         """
@@ -371,14 +383,9 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         self.data_dict = {}
 
         # initialize the start, stop, and step voltage
-        if self.sweep_arguments["start_from"] == 'max':
-            start_voltage = self.sweep_arguments["max_v"]
-            stop_voltage = -self.sweep_arguments["max_v"]
-            step_voltage = -self.sweep_arguments["step_v"]
-        elif self.sweep_arguments["start_from"] == '-max':
-            start_voltage = -self.sweep_arguments["max_v"]
-            stop_voltage = self.sweep_arguments["max_v"]
-            step_voltage = self.sweep_arguments["step_v"]
+        start_voltage = self.sweep_arguments["start_v"]
+        stop_voltage = self.sweep_arguments["stop_v"]
+        step_voltage = self.sweep_arguments["step_v"]
 
         self._do_sweep(start_voltage, step_voltage, stop_voltage)
 
@@ -411,7 +418,7 @@ class CustomizedStaircaseSweep(StaircaseSweep):
                 })
 
                 # sweep back
-                start, step, stop = -start, -step, -stop
+                start, step, stop = stop, -step, start
 
             # data list saved to database file
                 datasaver.add_result((self.sweep_current, current),
@@ -528,12 +535,16 @@ class CustomizedStaircaseSweep(StaircaseSweep):
         time = np.array(_time)
         # remove the next two points when changing measure range from 20 nA
         # to 200 pA
-        if flag142pA >= 5:
-            for i in flag142pAidx:
-                current[i] = np.nan
-                time[i] = np.nan
-                voltage[i] = np.nan
-        # remove bad points, (usually infinite values)
-        current[current > 1] = np.nan
+        try:
+            if flag142pA >= 5:
+                for i in flag142pAidx:
+                    current[i] = np.nan
+                    time[i] = np.nan
+                    voltage[i] = np.nan
+            # remove bad points, (usually infinite values)
+            current[current > 1] = np.nan
+        except:
+            # TODO sometimes an error pops up here, need to figure out why
+            pass
 
         return current, time, voltage
