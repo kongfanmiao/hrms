@@ -1,0 +1,18 @@
+# Default station used for hrms
+
+instruments:
+  keithley6517a:
+    type: qcodes.instrument_drivers.tektronix.Keithley_6517A.Keithley_6517A
+    address: GPIB0::15::INSTR
+    enable_forced_reconnect: false    
+    parameters:
+      sense_function:
+        initial_value: 'current'
+      meter_connect:
+        initial_value: 1
+      res_auto_vsource:
+        initial_value: 0
+      res_vsource_range:
+        initial_value: 1000
+
+      
